@@ -1,15 +1,31 @@
-FROM lambci/lambda-base-2:build
-ENV GS_TAG=gs10040
-ENV GS_VERSION=10.04.0
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023
 
-RUN yum install -y wget
+ENV GS_TAG=gs10051
+ENV GS_VERSION=10.05.1
 
-RUN mkdir /usr/local/src/ghostscript && \
+# Install system build dependencies
+RUN yum install -y \
+  gcc \
+  gcc-c++ \
+  make \
+  wget \
+  zip \
+  tar \
+  gzip \
+  which
+
+# Build and install Ghostscript
+RUN mkdir -p /usr/local/src/ghostscript && \
   cd /usr/local/src/ghostscript && \
-  wget -qO - https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/$GS_TAG/ghostscript-$GS_VERSION.tar.gz | tar -zxf - && \
-  cd ghostscript-$GS_VERSION && \
+  wget -q https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/${GS_TAG}/ghostscript-${GS_VERSION}.tar.gz && \
+  tar -zxf ghostscript-${GS_VERSION}.tar.gz && \
+  cd ghostscript-${GS_VERSION} && \
   ./configure --without-luratech && \
-  make && make install
+  make -j$(nproc) && \
+  make install
 
-RUN cd /usr/local && \
-  zip /tmp/gs.zip bin/gs
+# Package /opt directory as Lambda layer zip
+RUN mkdir -p /opt/bin && \
+  cp /usr/local/bin/gs /opt/bin/ && \
+  cd /opt && \
+  zip -r /tmp/ghostscript.zip .
